@@ -1,21 +1,19 @@
-const express = require('express');
-const app = express();
 const SerialPort = require('serialport');
 const Readline = require('@serialport/parser-readline');
 const crc = require('crc');
 
-const port = new SerialPort("COM4", {
+
+const port = new SerialPort("/dev/tty.usbserial-DABIOSAN", {
     baudRate: 19200,
     dataBits: 8,
     stopBits: 1,
     parity: "none",
-    // autoOpen: false
 })
 
-const parser = SerialPort.parsers.Readline;
+const parser = new Readline();
 port.pipe(parser);
 
-// SerialPort.list().then(port => console.log(port))
+SerialPort.list().then(port => console.log(port))
 
 parser.on('data', data => console.log(data));
 port.write("kdkdk", null, (err) => console.log('err', err));
@@ -29,7 +27,17 @@ port.on('error', (err) => {
     console.log(err)
 });
 
-const byteArr = Uint8Array.from(buffer);
+let w = 24;
+
+const res = new Buffer.alloc(4);
+res[0] = w;
+res[1] = w >> 8
+w = Math.round(91.4285714);
+res[2] = w;
+res[3] = w >> 8;
+
+let connector;
+
 
 const getIdBuffer = new Buffer.alloc(5, [5, 4, 1, 0x14, 0])
 
@@ -52,6 +60,34 @@ port.write(getByteFrame(buffer, 11), async(err, bytesWritten) => {
     console.log("bytesWritten", await bytesWritten);
 })
 
+port.write(GetReqToSendData(connector, 0x25, 1, res, 4), async(err, res) => {
+    console.log('lol', GetReqToSendData(connector, 0x25, 1, res, 4))
+    console.log(await err);
+    console.log(await res);
+})
+
+function GetReqToSendData(conn, tag, param, buf, len) {
+    const dfBuf = new Buffer.alloc(11);
+    dfBuf[0] = 1 + 1 + 1 + 2 + 1 + 1 + len;
+    dfBuf[1] = 4;
+    dfBuf[2] = 0;
+    dfBuf[3] = conn;
+    dfBuf[4] = conn >> 8;
+    dfBuf[5] = tag;
+    dfBuf[6] = param;
+
+    if (buf != null)
+        {
+            for (let i = 0; i < len; i++)
+            {
+                dfBuf[i + 7] = buf[i];
+            }
+        }
+
+
+    return getByteFrame(dfBuf, dfBuf[0]);
+}
+
 function getByteFrame(buff, len){
     const pba = new Buffer.alloc(16);
 
@@ -72,11 +108,3 @@ function getByteFrame(buff, len){
 port.on('data', (data) => console.log(data))
 port.on('close', () => console.log('closed')) 
 port.on('err', err => console.log(err))
-
-
-
-// app.get('/', (req, res) => {
-//     res.send('Hello')
-// })
-
-// app.listen(3000, () => console.log(`listening on port 3000`));
