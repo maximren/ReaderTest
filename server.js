@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const SerialPort = require('serialport');
 const Readline = require('@serialport/parser-readline');
+const crc = require('crc');
 
 const port = new SerialPort("COM4", {
     baudRate: 19200,
@@ -11,14 +12,15 @@ const port = new SerialPort("COM4", {
     // autoOpen: false
 })
 
-const parser = new Readline();
+const parser = SerialPort.parsers.Readline;
 port.pipe(parser);
 
-SerialPort.list().then(port => console.log(port))
+// SerialPort.list().then(port => console.log(port))
 
 parser.on('data', data => console.log(data));
+port.write("kdkdk", null, (err) => console.log('err', err));
 
-const buffer = new Buffer.alloc(11, [11, 4,  1, 0x10, 0], 'hex');
+const buffer = new Buffer.alloc(11, [11, 4,  1, 0x10, 0]);
 
 port.on("open", () => console.log('port is open', port.baudRate))
 port.on('data', (data) => console.log(data))
@@ -27,14 +29,45 @@ port.on('error', (err) => {
     console.log(err)
 });
 
-const frame = new Uint8Array(Buffer.from(buffer), 0, 13);
+const byteArr = Uint8Array.from(buffer);
 
-port.write(frame, async(err, bytesWritten) => {
-    console.log(frame)
-    console.log(err, bytesWritten);
-    console.log("calbackErr", err);
-    console.log("bytesWritten", bytesWritten);
+const getIdBuffer = new Buffer.alloc(5, [5, 4, 1, 0x14, 0])
+
+port.write(getByteFrame(getIdBuffer, 11), async(err, res) => {
+    console.log(getIdBuffer)
+    console.log(getByteFrame(getIdBuffer, 11))
+    console.log('err', await err)
+    console.log('res', await res)
 })
+
+port.write(getByteFrame(buffer, 11), async(err, bytesWritten) => {
+    console.log(buffer)
+    console.log("calbackErr", await err);
+    console.log("bytesWritten", await bytesWritten);
+})
+
+port.write(getByteFrame(buffer, 11), async(err, bytesWritten) => {
+    console.log(buffer)
+    console.log("calbackErr", await err);
+    console.log("bytesWritten", await bytesWritten);
+})
+
+function getByteFrame(buff, len){
+    const pba = new Buffer.alloc(16);
+
+    for (i = 0; i < len; i++) {
+        pba[i] = buff[i]
+    }
+
+    pba[0] = pba[0] + 2;
+
+    const crcDec = crc.crc16(pba).toString(len);
+
+    pba[len] = crcDec & 0xFF;
+    pba[len + 1] = crcDec >> 8 & 0xFF;
+
+    return pba;
+}
 
 port.on('data', (data) => console.log(data))
 port.on('close', () => console.log('closed')) 
