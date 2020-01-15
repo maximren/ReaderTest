@@ -1,7 +1,8 @@
 const SerialPort = require('serialport');
 const Readline = require('@serialport/parser-readline');
-// const crc = require('crc');
 
+//COM4 for Windows
+///dev/tty.usbserial-DABIOSAN for macOS
 
 const port = new SerialPort("/dev/tty.usbserial-DABIOSAN", {
     baudRate: 19200,
@@ -27,7 +28,7 @@ buffer[4] = 0;
 const byteBuffer = new Uint8Array(buffer)
 
 port.on("open", () => console.log('port is open', port.baudRate))
-port.on('data', (data) => console.log(data))
+port.on('data', (data) => console.log('Data:', data))
 port.on('readable', () => console.log('Read: ', port.read()));
 port.on('error', (err) => {
     console.log(err)
@@ -70,17 +71,19 @@ port.write(getByteFrame(getIdBuffer, 11), function(err, res) {
                         console.log('write3 err =', err)
                     } else {
                         console.log('write3 res =', bytesWritten);
+                        port.write(GetReqToSendData(0, 0x40, 1, 60, 1), function(err, resp) {
+                            if (err) {
+                                console.log('write4 err=', err);
+                            } else {
+                                console.log('write4 res =', resp);
+                            }
+                        })
                     }
                 })
             }
         })
     }
 })
-
-// port.write(GetReqToSendData(), async(err, res) => {
-//     console.log(await err)
-//     console.log(await res)
-// })
 
 function GetReqToSendData(conn, tag, param, buf, len) {
     const dfBuf = new ArrayBuffer(11);
@@ -150,6 +153,5 @@ function crc16(buf, BufferLength)
             return crc;
         }
 
-port.on('data', (data) => console.log(data))
 port.on('close', () => console.log('closed')) 
 port.on('err', err => console.log(err))
