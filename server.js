@@ -20,122 +20,37 @@ parser.on('data', data => console.log(data));
 
 port.on('open', () => console.log('port is open', port.baudRate));
 port.on('data', data => console.log('Data:', data));
-port.on('readable', () => console.log('Read: ', port.read()));
 port.on('error', err => {
   console.log(err);
 });
 
-const getIdBuffer = new Buffer.alloc(5);
-getIdBuffer[0] = 5;
-getIdBuffer[1] = 4;
-getIdBuffer[2] = 1;
-getIdBuffer[3] = 0x14;
-getIdBuffer[4] = 0;
+const rqXID = new Buffer.alloc(
+  16,
+  new Buffer([7, 4, 1, 20, 0, 206, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+);
 
-port.write(getByteFrame(getIdBuffer, 11), function(err, res) {
+const rqConnect = new Buffer.alloc(
+  16,
+  new Buffer([13, 4, 1, 16, 0, 82, 48, 48, 48, 55, 54, 164, 158, 0, 0, 0])
+);
+
+const runMeasure = new Buffer.alloc(
+  16,
+  new Buffer([10, 4, 0, 216, 8, 64, 1, 60, 167, 146, 0, 0, 0, 0, 0, 0])
+);
+
+port.write(rqXID, function(err, res = 13) {
   if (err) {
-    console.log('write1 err =', err);
+    console.log(err)
   } else {
-    console.log('write1 res =', res);
-    const buffer = new Buffer.alloc(11);
-    buffer[0] = 11;
-    buffer[1] = 4;
-    buffer[2] = 1;
-    buffer[3] = 0x10;
-    buffer[4] = 0;
-    buffer[5] = 82;
-    buffer[6] = 48;
-    buffer[7] = 48;
-    buffer[8] = 48;
-    buffer[9] = 55;
-    buffer[10] = 54;
-
-    port.write(getByteFrame(buffer, 11), function(err, bytesWritten) {
+    port.write(rqConnect, function(err, bytesWritten) {
       if (err) {
-        console.log('write2 err =', err);
+        console.log(err)
       } else {
-        console.log('write2 res =', bytesWritten);
-        buffer[5] = 82;
-        buffer[6] = 72;
-        buffer[7] = 65;
-        buffer[8] = 75;
-        buffer[9] = 69;
-        buffer[10] = 82;
-        port.write(getByteFrame(buffer, 11), function(err, bytesWritten) {
-          if (err) {
-            console.log('write3 err =', err);
-          } else {
-            console.log('write3 res =', bytesWritten);
-            port.write(GetReqToSendData(0, 0x40, 1, 60, 1), function(
-              err,
-              resp,
-            ) {
-              if (err) {
-                console.log('write4 err=', err);
-              } else {
-                console.log('write4 res =', resp);
-              }
-            });
-          }
-        });
+        port.write(runMeasure);
       }
     });
   }
 });
-
-function GetReqToSendData(conn, tag, param, buf, len) {
-  const dfBuf = new Buffer.alloc(11);
-  dfBuf[0] = 1 + 1 + 1 + 2 + 1 + 1 + len;
-  dfBuf[1] = 4;
-  dfBuf[2] = 0;
-  dfBuf[3] = conn;
-  dfBuf[4] = conn >> 8;
-  dfBuf[5] = tag;
-  dfBuf[6] = param;
-
-  if (buf != null) {
-    for (let i = 0; i < len; i++) {
-      dfBuf[i + 7] = buf[i];
-    }
-  }
-
-  return getByteFrame(dfBuf, dfBuf[0]);
-}
-
-function getByteFrame(buff, len) {
-  const pba = new Buffer.alloc(16);
-
-  for (i = 0; i < len; i++) {
-    pba[i] = buff[i];
-  }
-
-  pba[0] = (pba[0] + 2);
-
-  const crc = crc16(pba, len);
-
-  pba[len] = (crc & 0xff);
-  pba[len + 1] = ((crc >> 8) & 0xff);
-
-  return pba;
-}
-
-function crc16(buf, BufferLength) {
-  const CRC_CONST = 0xA001;
-  const pba = buf;
-  let crc = 0xffff;
-
-  for (let i = 0; i < BufferLength; i++) {
-    crc = crc ^ pba[i];
-    for (let j = 0; j <= 7; j++) {
-      if ((crc & 1) != 0) {
-        crc = crc >> 1;
-        crc = crc ^ CRC_CONST;
-      } else {
-        crc = crc >> 1;
-      }
-    }
-  }
-  return crc;
-}
 
 port.on('close', () => console.log('closed'));
